@@ -1,0 +1,17 @@
+"""Application settings, read from environment variables (and the .env file)."""
+
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./cybersentinel.db")
+MAX_UPLOAD_BYTES: int = int(os.getenv("MAX_UPLOAD_BYTES", "2000000"))  # 2 MB
+ACCESS_TOKEN_MINUTES: int = int(os.getenv("ACCESS_TOKEN_MINUTES", "60"))
+
+SECRET_KEY: str = os.getenv("SECRET_KEY", "")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY is not set. Create a .env file (see .env.example) with a random value."
+    )

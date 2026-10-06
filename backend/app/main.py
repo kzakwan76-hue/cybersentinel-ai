@@ -1,5 +1,7 @@
 """CyberSentinel AI: FastAPI application."""
+from pathlib import Path
 
+from fastapi.staticfiles import StaticFiles
 import logging
 from typing import Literal
 
@@ -171,3 +173,7 @@ def stats(db: Session = Depends(get_db), current_user: orm.User = Depends(get_cu
         by_severity=by_severity,
         top_ips=[IpCount(ip=ip, count=count) for ip, count in ip_rows],
     )
+
+FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+if FRONTEND_DIR.is_dir():
+    app.mount("/dashboard", StaticFiles(directory=FRONTEND_DIR, html=True), name="dashboard")

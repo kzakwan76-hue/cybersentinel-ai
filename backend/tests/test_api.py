@@ -81,3 +81,7 @@ def test_users_cannot_see_each_others_data():
     assert client.get("/findings", headers=OTHER_USER).json() == []
     assert client.get("/uploads", headers=OTHER_USER).json() == []
     assert client.get("/stats", headers=OTHER_USER).json()["total_uploads"] == 0
+
+
+def test_dashboard_is_served():
+    assert client.get("/dashboard/").status_code == 200

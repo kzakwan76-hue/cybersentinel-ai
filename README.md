@@ -4,6 +4,12 @@ An AI-assisted security log analysis platform. Upload authentication and server 
 
 > Defensive and educational. It analyzes logs only. It contains no attack tooling and is evaluated on **synthetic data**.
 
+![Dashboard](docs/dashboard..png)
+![ML findings](docs/ml-findings..png)
+![Threats](Threats ss.png)
+
+[Sample PDF report](docs/sample-report.pdf)
+
 ## Features
 
 - Log upload, parsing and normalization (bad lines are reported, never fatal)

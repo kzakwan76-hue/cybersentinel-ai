@@ -15,7 +15,7 @@ from app.config import MAX_UPLOAD_BYTES
 from app.database import Base, engine, get_db
 from app.deps import get_current_user
 from app.schemas import AnalysisOut, FindingOut, IpCount, StatsOut, UploadOut
-from app.services.detectors import detect
+from app.services.analysis import analyze_events
 from app.services.parser import parse_logs
 
 logging.basicConfig(level=logging.INFO)
@@ -62,7 +62,7 @@ async def analyze(
     if not parsed.events:
         raise HTTPException(status_code=422, detail="No valid log lines found.")
 
-    findings = detect(parsed.events)
+    findings = analyze_events(parsed.events)
 
     upload = orm.Upload(
         user_id=current_user.id,

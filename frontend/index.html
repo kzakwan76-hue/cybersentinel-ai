@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CyberSentinel AI</title>
+<style>
+:root{--bg:#0b1020;--panel:#131a2e;--panel2:#0f1730;--line:#232d4b;--txt:#e6ebf7;--mut:#8b97b8;--acc:#58a6ff;
+--LOW:#3fb950;--MEDIUM:#d29922;--HIGH:#f0883e;--CRITICAL:#f85149}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 system-ui,sans-serif}
+header{padding:14px 24px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+header h1{font-size:18px;margin:0}
+header small{color:var(--mut)}
+main{max-width:1150px;margin:0 auto;padding:20px;display:grid;gap:16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.panel h2{font-size:15px;margin:0 0 12px}
+button,select,input{background:#1b2542;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font:inherit}
+button{cursor:pointer}
+button.primary{background:var(--acc);color:#04111f;border-color:var(--acc);font-weight:600}
+button:disabled{opacity:.5;cursor:wait}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat b{display:block;font-size:28px}
+.stat small{color:var(--mut)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.bar{display:flex;align-items:center;gap:8px;margin:8px 0}
+.bar .lbl{width:84px;color:var(--mut)}
+.bar .track{flex:1;background:#0d1326;border-radius:5px;height:12px;overflow:hidden}
+.bar .fill{height:100%;border-radius:5px;min-width:2px}
+.bar .num{width:32px;text-align:right}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--mut)}
+.drop.over{border-color:var(--acc);color:var(--txt)}
+.badge{padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;color:#0b1020}
+.card{border-left:4px solid var(--mut);background:var(--panel2);border-radius:8px;padding:12px 14px;margin-bottom:10px}
+.card h3{margin:0 0 4px;font-size:15px}
+.card p{margin:4px 0;color:var(--mut)}
+.card p b{color:var(--txt)}
+.card ul{margin:4px 0 0;padding-left:20px;color:var(--mut)}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+.scroll{overflow-x:auto}
+.msg{color:var(--HIGH);min-height:20px}
+.ok{color:var(--LOW)}
+.muted{color:var(--mut)}
+.auth{max-width:380px;margin:12vh auto;padding:0 16px}
+.auth .panel{display:grid;gap:10px}
+.auth input{width:100%}
+</style>
+</head>
+<body>
+
+<div id="auth" class="auth" hidden>
+  <div class="panel">
+    <h1 style="margin:0">🛡️ CyberSentinel AI</h1>
+    <span class="muted">Log analysis · defensive &amp; educational · synthetic data only</span>
+    <input id="email" type="email" placeholder="Email" autocomplete="username">
+    <input id="password" type="password" placeholder="Password (8+ characters)" autocomplete="current-password">
+    <div class="row">
+      <button class="primary" id="loginBtn">Log in</button>
+      <button id="registerBtn">Create account</button>
+    </div>
+    <div id="authMsg" class="msg"></div>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <div><h1>🛡️ CyberSentinel AI</h1><small>Defensive log analysis · synthetic data only</small></div>
+    <div class="row"><span class="muted" id="who"></span><button id="logoutBtn">Log out</button></div>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>Analyze a log file</h2>
+      <div class="drop" id="drop">
+        Drag a .log or .txt file here, or
+        <input type="file" id="file" accept=".log,.txt">
+        <div id="uploadMsg" class="msg"></div>
+      </div>
+    </section>
+
+    <section class="stats" id="stats"></section>
+
+    <section class="two">
+      <div class="panel"><h2>Findings by severity</h2><div id="bars"></div></div>
+      <div class="panel"><h2>Top source IPs</h2><div id="topIps"></div></div>
+    </section>
+
+    <section class="panel">
+      <div class="row" style="margin-bottom:12px">
+        <h2 style="margin:0">Threat history</h2>
+        <select id="sev">
+          <option value="">All severities</option>
+          <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+        </select>
+        <input id="q" type="text" placeholder="Search IP or text…" maxlength="100">
+      </div>
+      <div id="findings"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Upload history</h2>
+      <div class="scroll"><table id="uploads"></table></div>
+    </section>
+  </main>
+</div>
+
+<script>
+"use strict";
+const LEVELS = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+const MAX_BYTES = 2_000_000;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const sev = s => LEVELS.includes(s) ? s : "LOW";
+const fmtDate = s => new Date(/[zZ]|[+-]\d\d:\d\d$/.test(s) ? s : s + "Z").toLocaleString();
+
+let token = sessionStorage.getItem("token");
+
+/* ---------- API helper ---------- */
+async function api(path, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(path, { ...options, headers });
+  if (res.status === 401 && token) { logout(); throw new Error("Session expired. Please log in again."); }
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      detail = typeof body.detail === "string" ? body.detail : (body.detail?.[0]?.msg || detail);
+    } catch { /* keep statusText */ }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+/* ---------- Auth ---------- */
+async function login(email, password) {
+  const data = await api("/auth/login", { method: "POST", body: new URLSearchParams({ username: email, password }) });
+  token = data.access_token;
+  sessionStorage.setItem("token", token);
+  await showApp();
+}
+
+function logout() {
+  token = null;
+  sessionStorage.removeItem("token");
+  $("app").hidden = true;
+  $("auth").hidden = false;
+}
+
+async function authAction(register) {
+  const email = $("email").value.trim(), password = $("password").value;
+  $("authMsg").textContent = "";
+  try {
+    if (register) await api("/auth/register", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password })
+    });
+    await login(email, password);
+    $("password").value = "";
+  } catch (err) { $("authMsg").textContent = err.message; }
+}
+
+/* ---------- Rendering ---------- */
+function renderStats(s) {
+  $("stats").innerHTML = [
+    ["Uploads", s.total_uploads], ["Threats found", s.total_findings],
+    ["Critical", s.by_severity.CRITICAL], ["High", s.by_severity.HIGH]
+  ].map(([k, v]) => `<div class="panel stat"><b>${v}</b><small>${k}</small></div>`).join("");
+
+  const max = Math.max(1, ...Object.values(s.by_severity));
+  $("bars").innerHTML = LEVELS.map(l => `<div class="bar"><span class="lbl">${l}</span>
+    <div class="track"><div class="fill" style="width:${s.by_severity[l] / max * 100}%;background:var(--${l})"></div></div>
+    <span class="num">${s.by_severity[l]}</span></div>`).join("");
+
+  const topMax = Math.max(1, ...s.top_ips.map(i => i.count));
+  $("topIps").innerHTML = s.top_ips.length ? s.top_ips.map(i => `<div class="bar"><span class="lbl" style="width:120px">${esc(i.ip)}</span>
+    <div class="track"><div class="fill" style="width:${i.count / topMax * 100}%;background:var(--HIGH)"></div></div>
+    <span class="num">${i.count}</span></div>`).join("") : `<span class="muted">No data yet.</span>`;
+}
+
+function renderFindings(list) {
+  $("findings").innerHTML = list.length ? list.map(f => `
+    <div class="card" style="border-left-color:var(--${sev(f.severity)})">
+      <h3>⚠️ ${esc(f.title)} <span class="badge" style="background:var(--${sev(f.severity)})">${esc(f.severity)}</span></h3>
+      <p><b>Source:</b> ${esc(f.ip)} &nbsp; <b>Time:</b> ${esc(f.log_timestamp || "n/a")} &nbsp; <b>Upload:</b> #${f.upload_id}</p>
+      <p><b>Why flagged:</b> ${esc(f.reason)}</p>
+      <p><b>Evidence lines:</b> ${esc(f.evidence_lines.join(", ") || "n/a")}</p>
+      <p><b>Recommended:</b></p><ul>${f.recommendations.map(r => `<li>${esc(r)}</li>`).join("")}</ul>
+    </div>`).join("") : `<span class="muted">No threats match. Upload a log file to get started.</span>`;
+}
+
+function renderUploads(list) {
+  $("uploads").innerHTML = "<tr><th>#</th><th>File</th><th>When</th><th>Events</th><th>Skipped</th></tr>" +
+    list.map(u => `<tr><td>${u.id}</td><td>${esc(u.filename)}</td><td>${esc(fmtDate(u.created_at))}</td>
+      <td>${u.events_parsed}</td><td>${u.lines_skipped}</td></tr>`).join("");
+}
+
+/* ---------- Loading data ---------- */
+async function loadFindings() {
+  const params = new URLSearchParams();
+  if ($("sev").value) params.set("severity", $("sev").value);
+  if ($("q").value.trim()) params.set("q", $("q").value.trim());
+  renderFindings(await api(`/findings?${params}`));
+}
+
+async function refresh() {
+  try {
+    const [stats, uploads] = await Promise.all([api("/stats"), api("/uploads")]);
+    renderStats(stats);
+    renderUploads(uploads);
+    await loadFindings();
+  } catch (err) { $("uploadMsg").textContent = err.message; }
+}
+
+async function showApp() {
+  const me = await api("/auth/me");
+  $("who").textContent = me.email;
+  $("auth").hidden = true;
+  $("app").hidden = false;
+  await refresh();
+}
+
+/* ---------- Upload ---------- */
+async function uploadFile(file) {
+  const msg = $("uploadMsg");
+  msg.className = "msg"; msg.textContent = "";
+  if (!file) return;
+  if (file.size > MAX_BYTES) { msg.textContent = "File too large (2 MB max)."; return; }
+  const form = new FormData();
+  form.append("file", file);
+  try {
+    msg.textContent = "Analyzing…";
+    const result = await api("/analyze", { method: "POST", body: form });
+    msg.className = "msg ok";
+    msg.textContent = `Analyzed ${result.upload.events_parsed} events, ${result.findings.length} threat(s) found` +
+      (result.upload.lines_skipped ? `, ${result.upload.lines_skipped} unreadable line(s) skipped.` : ".");
+    await refresh();
+  } catch (err) { msg.className = "msg"; msg.textContent = err.message; }
+  $("file").value = "";
+}
+
+/* ---------- Events ---------- */
+$("loginBtn").onclick = () => authAction(false);
+$("registerBtn").onclick = () => authAction(true);
+$("password").onkeydown = e => { if (e.key === "Enter") authAction(false); };
+$("logoutBtn").onclick = logout;
+$("file").onchange = e => uploadFile(e.target.files[0]);
+$("sev").onchange = () => loadFindings().catch(err => { $("uploadMsg").textContent = err.message; });
+let searchTimer;
+$("q").oninput = () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadFindings().catch(err => { $("uploadMsg").textContent = err.message; }), 300);
+};
+const drop = $("drop");
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => uploadFile(e.dataTransfer.files[0]));
+
+/* ---------- Start ---------- */
+if (token) showApp().catch(logout); else $("auth").hidden = false;
+</script>
+</body>
+</html>

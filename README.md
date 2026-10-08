@@ -96,39 +96,44 @@ Run the tests from the project root with `pytest`. The server also works without
 
 | Method | Precision | Recall | F1 | TP | FP | FN | TN |
 |---|---|---|---|---|---|---|---|
-| Rules only | 0.60 | 0.65 | 0.62 | 39 | 26 | 21 | 214 |
+| Rules (count only) | 0.60 | 0.65 | 0.62 | 39 | 26 | 21 | 214 |
+| Rules (with timing) | 0.97 | 0.65 | 0.78 | 39 | 1 | 21 | 239 |
 | Isolation Forest only | 0.79 | 0.80 | 0.79 | 48 | 13 | 12 | 227 |
 | ML (forest + range guard) | 0.82 | 0.98 | 0.89 | 59 | 13 | 1 | 227 |
-| Rules + ML (what the app runs) | 0.69 | 1.00 | 0.82 | 60 | 27 | 0 | 213 |
+| Rules (count) + ML | 0.69 | 1.00 | 0.82 | 60 | 27 | 0 | 213 |
+| **Rules (timing) + ML (what the app runs)** | **0.82** | **1.00** | **0.90** | 60 | 13 | 0 | 227 |
 
 Sessions flagged per type (test set):
 
-| Session type | Attack? | Total | Rules | Forest | ML (full) | Both |
-|---|---|---|---|---|---|---|
-| typical_user | no | 160 | 0 | 0 | 0 | 0 |
-| heavy_user | no | 31 | 0 | 1 | 1 | 1 |
-| admin_user | no | 23 | 0 | 0 | 0 | 0 |
-| forgetful_user | no | 26 | 26 | 12 | 12 | 26 |
-| brute_force | yes | 16 | 16 | 16 | 16 | 16 |
-| brute_no_success | yes | 12 | 12 | 12 | 12 | 12 |
-| scanner | yes | 7 | 7 | 7 | 7 | 7 |
-| sensitive_probe | yes | 4 | 4 | 3 | 3 | 4 |
-| bulk_access | yes | 10 | 0 | 10 | 10 | 10 |
-| post_login_abuse | yes | 11 | 0 | 0 | 11 | 11 |
+| Session type | Attack? | Total | Rules (count) | Rules (timing) | Forest | ML (full) | Rules (timing) + ML |
+|---|---|---|---|---|---|---|---|
+| typical_user | no | 160 | 0 | 0 | 0 | 0 | 0 |
+| heavy_user | no | 31 | 0 | 0 | 1 | 1 | 1 |
+| admin_user | no | 23 | 0 | 0 | 0 | 0 | 0 |
+| forgetful_user | no | 26 | 26 | 1 | 12 | 12 | 12 |
+| brute_force | yes | 16 | 16 | 16 | 16 | 16 | 16 |
+| brute_no_success | yes | 12 | 12 | 12 | 12 | 12 | 12 |
+| scanner | yes | 7 | 7 | 7 | 7 | 7 | 7 |
+| sensitive_probe | yes | 4 | 4 | 4 | 3 | 3 | 4 |
+| bulk_access | yes | 10 | 0 | 0 | 10 | 10 | 10 |
+| post_login_abuse | yes | 11 | 0 | 0 | 0 | 11 | 11 |
 
 **Findings**
 
 - Rules and ML fail in different places. Rules cannot see attackers with valid credentials (`bulk_access`, `post_login_abuse`: 0 of 21). ML catches both but missed one `sensitive_probe` that the rules caught. Together they missed none of these test attacks.
-- The range guard raised ML recall from 0.80 to 0.98 with no additional false alarms in this run.
-- The main weakness is **forgetful users**: the "3 failures then success" rule flags all of them, and the combined system's precision falls to 0.69 because of it. Timing information (failures within seconds versus spread over minutes) is the next planned improvement.
+- **Timing fixed the rules' biggest weakness.** The count-only rule flagged all 26 forgetful users. Requiring 3 failures within 60 seconds (or 5 or more failures at any speed) cut that to 1 with no attack lost. Precision of the combined system rose from 0.69 to 0.82.
+- All remaining false alarms (12 forgetful users and 1 heavy user) come from the ML model, which has no timing features yet.
 
-**Limitations (honest)**
+**Limitations**
 
-- All data is synthetic and was designed by the author, so these numbers demonstrate the method, not real-world performance.
-- Results come from one train/test split with one seed; repeated runs or cross-validation would give confidence intervals.
-- The range guard was added after a test exposed a weakness, and its margin (1.25) was not tuned on a separate validation set.
-- Detection operates per source IP with no time dimension yet; there is no IP-reputation data.
-- ML findings are fixed at MEDIUM severity and should be read as leads to investigate, not confirmed attacks.
+- All data is synthetic and designed by the author. In particular, forgetful users were generated as slow and attackers as fast, so the timing result shows the method works under that assumption, not that real traffic behaves this way.
+- The 60-second window and 5-failure threshold were chosen by hand and would need tuning on real logs. An attacker who tries only 3-4 passwords slowly would now evade the brute-force rule.
+- One train/test split with one seed; no confidence intervals.
+- The range guard's margin (1.25) was not tuned on a separate validation set.
+- Detection is per source IP; there is no IP-reputation data yet.
+- ML findings are fixed at MEDIUM severity and are leads to investigate, not confirmed attacks.
+
+
 
 ## Roadmap
 

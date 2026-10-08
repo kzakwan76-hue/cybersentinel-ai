@@ -1,11 +1,14 @@
 """Synthetic labelled sessions for training and evaluating the anomaly detector.
 
 Labels come from how each session was GENERATED (ground truth), never from our rules.
+Timestamps are drawn from a SEPARATE random generator, so adding them does not change which
+sessions are produced.
 """
 
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 from app.models import Event, EventType
 from app.services.detectors import SENSITIVE_PATHS
@@ -30,6 +33,24 @@ ATTACK_KINDS = [
     "post_login_abuse",
     "bulk_access",
 ]
+
+BASE_TIME = datetime(2026, 10, 5, 8, 0, 0)
+TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+# Seconds between consecutive events, per session type:
+# (range around login attempts, range between other events).
+TIMING: dict[str, tuple[tuple[int, int], tuple[int, int]]] = {
+    "typical_user": ((10, 60), (2, 30)),
+    "heavy_user": ((10, 60), (2, 30)),
+    "forgetful_user": ((20, 150), (2, 30)),  # a person retyping a password: slow
+    "admin_user": ((10, 60), (2, 30)),
+    "brute_force": ((1, 3), (1, 5)),  # a script: fast
+    "brute_no_success": ((1, 3), (1, 3)),
+    "scanner": ((0, 2), (0, 2)),
+    "sensitive_probe": ((0, 2), (1, 10)),
+    "post_login_abuse": ((1, 5), (1, 20)),
+    "bulk_access": ((1, 5), (0, 2)),
+}
 
 
 @dataclass
@@ -105,9 +126,23 @@ _BUILDERS: dict[str, Callable[[random.Random], list[Step]]] = {
 }
 
 
+def _timestamps(kind: str, steps: list[Step], rng: random.Random) -> list[str]:
+    """One timestamp per step. Login attempts and other events use different speeds per kind."""
+    login_gap, other_gap = TIMING[kind]
+    current = BASE_TIME + timedelta(seconds=rng.randint(0, 8 * 3600))
+    stamps = [current.strftime(TIME_FORMAT)]
+    for previous, step in zip(steps, steps[1:]):
+        around_login_attempt = EventType.FAILED_LOGIN in (previous[0], step[0])
+        low, high = login_gap if around_login_attempt else other_gap
+        current += timedelta(seconds=rng.randint(low, high))
+        stamps.append(current.strftime(TIME_FORMAT))
+    return stamps
+
+
 def generate_dataset(n_normal: int = 800, n_attack: int = 200, seed: int = 42) -> list[LabeledSession]:
     """One session per unique IP. The same seed always gives the same data."""
     rng = random.Random(seed)
+    time_rng = random.Random(seed + 1)  # separate, so timestamps don't change the sessions
     sessions: list[LabeledSession] = []
     next_line = 1
 
@@ -119,8 +154,9 @@ def generate_dataset(n_normal: int = 800, n_attack: int = 200, seed: int = 42) -
                 kind = rng.choice(ATTACK_KINDS)
             ip = f"10.0.{len(sessions) // 256}.{len(sessions) % 256}"
             steps = _BUILDERS[kind](rng)
+            stamps = _timestamps(kind, steps, time_rng)
             events = [
-                Event(next_line + i, None, ip, event_type, path)
+                Event(next_line + i, stamps[i], ip, event_type, path)
                 for i, (event_type, path) in enumerate(steps)
             ]
             next_line += len(events)

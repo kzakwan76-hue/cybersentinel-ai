@@ -85,3 +85,20 @@ def test_users_cannot_see_each_others_data():
 
 def test_dashboard_is_served():
     assert client.get("/dashboard/").status_code == 200
+
+
+def test_report_pdf_is_generated_for_own_upload():
+    upload_id = upload(SAMPLE_LOG).json()["upload"]["id"]
+    response = client.get(f"/uploads/{upload_id}/report.pdf", headers=ANALYST)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.content.startswith(b"%PDF")
+
+
+def test_report_is_hidden_from_other_users():
+    upload_id = upload(SAMPLE_LOG).json()["upload"]["id"]
+    assert client.get(f"/uploads/{upload_id}/report.pdf", headers=OTHER_USER).status_code == 404
+
+
+def test_report_requires_login():
+    assert client.get("/uploads/1/report.pdf").status_code == 401

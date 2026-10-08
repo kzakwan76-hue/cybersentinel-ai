@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 import logging
 from typing import Literal
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Response, UploadFile
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,7 @@ from app.deps import get_current_user
 from app.schemas import AnalysisOut, FindingOut, IpCount, StatsOut, UploadOut
 from app.services.analysis import analyze_events
 from app.services.parser import parse_logs
+from app.services.report import build_pdf
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("cybersentinel")
@@ -172,6 +173,23 @@ def stats(db: Session = Depends(get_db), current_user: orm.User = Depends(get_cu
         total_findings=total_findings,
         by_severity=by_severity,
         top_ips=[IpCount(ip=ip, count=count) for ip, count in ip_rows],
+    )
+@app.get("/uploads/{upload_id}/report.pdf")
+def download_report(
+    upload_id: int,
+    db: Session = Depends(get_db),
+    current_user: orm.User = Depends(get_current_user),
+):
+    """Download a PDF report for one of YOUR uploads."""
+    upload = db.scalar(
+        select(orm.Upload).where(orm.Upload.id == upload_id, orm.Upload.user_id == current_user.id)
+    )
+    if upload is None:  # same answer for "missing" and "belongs to someone else"
+        raise HTTPException(status_code=404, detail="Upload not found.")
+    return Response(
+        content=build_pdf(upload),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="cybersentinel-report-{upload.id}.pdf"'},
     )
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"

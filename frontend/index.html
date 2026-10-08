@@ -191,9 +191,10 @@ function renderFindings(list) {
 }
 
 function renderUploads(list) {
-  $("uploads").innerHTML = "<tr><th>#</th><th>File</th><th>When</th><th>Events</th><th>Skipped</th></tr>" +
+  $("uploads").innerHTML = "<tr><th>#</th><th>File</th><th>When</th><th>Events</th><th>Skipped</th><th>Report</th></tr>" +
     list.map(u => `<tr><td>${u.id}</td><td>${esc(u.filename)}</td><td>${esc(fmtDate(u.created_at))}</td>
-      <td>${u.events_parsed}</td><td>${u.lines_skipped}</td></tr>`).join("");
+      <td>${u.events_parsed}</td><td>${u.lines_skipped}</td>
+      <td><button data-report="${u.id}">PDF</button></td></tr>`).join("");
 }
 
 /* ---------- Loading data ---------- */
@@ -239,6 +240,21 @@ async function uploadFile(file) {
   } catch (err) { msg.className = "msg"; msg.textContent = err.message; }
   $("file").value = "";
 }
+
+/* ---------- Report download ---------- */
+async function downloadReport(id) {
+  try {
+    const res = await fetch(`/uploads/${id}/report.pdf`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error("Could not generate the report.");
+    const url = URL.createObjectURL(await res.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `cybersentinel-report-${id}.pdf`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch (err) { $("uploadMsg").textContent = err.message; }
+}
+$("uploads").onclick = e => { const id = e.target.dataset.report; if (id) downloadReport(id); };
 
 /* ---------- Events ---------- */
 $("loginBtn").onclick = () => authAction(false);

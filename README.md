@@ -1,5 +1,7 @@
 # CyberSentinel AI
 
+![tests](https://github.com/kzakwan76-hue/cybersentinel-ai/actions/workflows/ci.yml/badge.svg)
+
 An AI-assisted security log analysis platform. Upload authentication and server logs, and CyberSentinel parses them, detects suspicious behavior with both **explicit rules** and a **machine-learning anomaly detector**, assigns a risk level, **explains why** each source was flagged, and presents the results in a dashboard with downloadable PDF reports.
 
 > Defensive and educational. It analyzes logs only. It contains no attack tooling and is evaluated on **synthetic data**.

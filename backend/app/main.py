@@ -24,8 +24,7 @@ logger = logging.getLogger("cybersentinel")
 
 SEVERITY_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 
-# Creates the tables if they don't exist yet (later we'll switch to migrations).
-Base.metadata.create_all(bind=engine)
+
 
 app = FastAPI(title="CyberSentinel AI", version="0.4.0")
 app.include_router(auth.router)

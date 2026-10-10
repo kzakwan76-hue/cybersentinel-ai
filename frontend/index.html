@@ -130,6 +130,8 @@ async function api(path, options = {}) {
       const body = await res.json();
       detail = typeof body.detail === "string" ? body.detail : (body.detail?.[0]?.msg || detail);
     } catch { /* keep statusText */ }
+        const wait = res.headers.get("Retry-After");
+    if (res.status === 429 && wait) detail += ` Try again in about ${Math.ceil(wait / 60)} minute(s).`;
     throw new Error(detail);
   }
   return res.json();

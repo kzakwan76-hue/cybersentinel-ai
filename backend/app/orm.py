@@ -54,3 +54,12 @@ class FindingRecord(Base):
     log_timestamp: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     upload: Mapped[Upload] = relationship(back_populates="findings")
+
+
+class LoginFailure(Base):
+    __tablename__ = "login_failures"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), index=True)  # whatever was typed, even if no such account
+    ip: Mapped[str] = mapped_column(String(45), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)    

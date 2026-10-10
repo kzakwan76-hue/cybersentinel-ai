@@ -16,6 +16,9 @@ MODEL_PATH: Path = Path(os.getenv("MODEL_PATH", str(DEFAULT_MODEL_PATH)))
 ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
 LLM_MODEL: str = os.getenv("LLM_MODEL", "claude-haiku-4-5-20251001")
 LLM_TIMEOUT_SECONDS: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
+LOGIN_MAX_FAILURES: int = int(os.getenv("LOGIN_MAX_FAILURES", "5"))
+LOGIN_MAX_FAILURES_PER_IP: int = int(os.getenv("LOGIN_MAX_FAILURES_PER_IP", "20"))
+LOGIN_WINDOW_MINUTES: int = int(os.getenv("LOGIN_WINDOW_MINUTES", "15"))
 
 SECRET_KEY: str = os.getenv("SECRET_KEY", "")
 if not SECRET_KEY:

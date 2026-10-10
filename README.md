@@ -85,6 +85,7 @@ Run the tests from the project root with `pytest`. The server also works without
 - Upload size is limited, files must be UTF-8, and all inputs are validated with Pydantic.
 - Log content is untrusted: it is HTML-escaped in the dashboard and escaped before it reaches the PDF library.
 - Saved model files are only loaded from a local path (joblib files can execute code if loaded from untrusted sources).
+- Login throttling: failed attempts are stored in the database and limited per (email, IP) pair (5 per 15 minutes) and per IP (20 per 15 minutes). A locked client gets `429` with `Retry-After`, even with the right password. Limits apply to unknown emails too, so lockouts never reveal which accounts exist. 
 
 ## Machine learning and evaluation
 
@@ -134,6 +135,7 @@ Sessions flagged per type (test set):
 - The range guard's margin (1.25) was not tuned on a separate validation set.
 - Detection is per source IP; there is no IP-reputation data yet.
 - ML findings are fixed at MEDIUM severity and are leads to investigate, not confirmed attacks.
+- Login throttling uses the connecting IP address. Behind a reverse proxy every user shares the proxy's IP unless trusted-proxy handling is configured, and a distributed attack (many IPs against one account) is not throttled per account.
 
 ## AI-written summaries (optional)
 

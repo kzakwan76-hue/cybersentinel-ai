@@ -143,10 +143,12 @@ Sessions flagged per type (test set):
 - [x] FastAPI + database, authentication, dashboard
 - [x] ML anomaly detection with evaluation
 - [x] PDF reports
-- [ ] Timing features (failure rate, events per minute) to separate forgetful users from attacks
+- [X] Timing features (failure rate, events per minute) to separate forgetful users from attacks
 - [ ] IP reputation lookups via a legitimate API
 - [ ] Docker, then cloud deployment
-- [ ] Migrations (Alembic) and PostgreSQL
+- [X] Migrations (Alembic) and PostgreSQL
+
+Database and migrations. The app uses SQLite by default. To use PostgreSQL, set DATABASE_URL to a PostgreSQL URL (tested on Neon). The schema is managed with Alembic: run cd backend then alembic upgrade head to create or update it. After changing app/orm.py, generate a migration with alembic revision --autogenerate -m "describe change".
 
 ## Responsible use
 

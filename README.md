@@ -153,3 +153,5 @@ Database and migrations. The app uses SQLite by default. To use PostgreSQL, set 
 ## Responsible use
 
 For defensive analysis and learning only. Use synthetic or properly authorized data. Detections are estimates and should be verified by a person before any action is taken.
+
+## “Not currently hosted. Run locally with the steps below.”

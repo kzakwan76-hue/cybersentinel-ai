@@ -89,46 +89,50 @@ Run the tests from the project root with `pytest`. The server also works without
 
 ## Machine learning and evaluation
 
-**Features** (per source IP): total events, failed logins, successful logins, page requests, failure ratio, distinct paths, sensitive-path hits, longest failure streak.
+**Protocol:** the experiment is repeated over 20 runs. Each run generates a new synthetic dataset (800 normal and 200 attack sessions), makes a new stratified 70/30 split, trains the model on normal training sessions only (with a new model seed) and scores every method on the 300 unseen sessions (240 normal, 60 attacks). Reproduce with `python backend\evaluate_seeds.py 20`. Cells show mean ± standard deviation [min–max] over the 20 runs.
 
-**Model:** an Isolation Forest trained on **normal behavior only**, plus a range guard that flags any feature far beyond the most extreme normal training example. Every ML finding lists the features that deviate most from the baseline, so each flag can be explained.
+| Method | Precision | Recall | F1 |
+|---|---|---|---|
+| Rules (count only) | 0.68 ± 0.04 [0.59–0.75] | 0.67 ± 0.06 [0.53–0.75] | 0.67 ± 0.04 [0.58–0.73] |
+| Rules (with timing) | 0.99 ± 0.02 [0.93–1.00] | 0.67 ± 0.06 [0.53–0.75] | 0.79 ± 0.04 [0.69–0.86] |
+| Isolation Forest only | 0.89 ± 0.03 [0.83–0.96] | 0.72 ± 0.10 [0.50–0.85] | 0.79 ± 0.07 [0.64–0.87] |
+| ML (forest + range guard) | 0.91 ± 0.03 [0.87–0.97] | 0.98 ± 0.03 [0.90–1.00] | 0.95 ± 0.02 [0.89–0.98] |
+| Rules (count) + ML | 0.74 ± 0.04 [0.66–0.81] | 1.00 ± 0.00 [1.00–1.00] | 0.85 ± 0.03 [0.79–0.90] |
+| **Rules (timing) + ML (what the app runs)** | 0.91 ± 0.03 [0.87–0.95] | 1.00 ± 0.00 [1.00–1.00] | 0.95 ± 0.01 [0.93–0.98] |
 
-**Data:** 1,000 synthetic IP sessions (800 normal, 200 attack) generated with a fixed seed. Labels come from how each session was generated, never from the detection rules. Normal types: typical, heavy, forgetful (3-4 mistyped passwords), admin. Attack types: brute force (with and without success), scanner, sensitive-path probe, post-login abuse (valid login then many sensitive pages), bulk access (valid login then a very large number of requests).
+Share of sessions flagged per session type (mean over the 20 runs; for attack types higher is better, for normal types lower is better):
 
-**Protocol:** stratified 70/30 split. The model trains only on normal training sessions and is tested on 300 unseen sessions (240 normal, 60 attacks). Reproduce with `python backend\train_anomaly.py`.
-
-| Method | Precision | Recall | F1 | TP | FP | FN | TN |
+| Session type | Attack? | Rules (count) | Rules (timing) | Forest | ML (full) | Rules (count) + ML | Rules (timing) + ML |
 |---|---|---|---|---|---|---|---|
-| Rules (count only) | 0.60 | 0.65 | 0.62 | 39 | 26 | 21 | 214 |
-| Rules (with timing) | 0.97 | 0.65 | 0.78 | 39 | 1 | 21 | 239 |
-| Isolation Forest only | 0.79 | 0.80 | 0.79 | 48 | 13 | 12 | 227 |
-| ML (forest + range guard) | 0.82 | 0.98 | 0.89 | 59 | 13 | 1 | 227 |
-| Rules (count) + ML | 0.69 | 1.00 | 0.82 | 60 | 27 | 0 | 213 |
-| **Rules (timing) + ML (what the app runs)** | **0.82** | **1.00** | **0.90** | 60 | 13 | 0 | 227 |
-
-Sessions flagged per type (test set):
-
-| Session type | Attack? | Total | Rules (count) | Rules (timing) | Forest | ML (full) | Rules (timing) + ML |
-|---|---|---|---|---|---|---|---|
-| typical_user | no | 160 | 0 | 0 | 0 | 0 | 0 |
-| heavy_user | no | 31 | 0 | 0 | 1 | 1 | 1 |
-| admin_user | no | 23 | 0 | 0 | 0 | 0 | 0 |
-| forgetful_user | no | 26 | 26 | 1 | 12 | 12 | 12 |
-| brute_force | yes | 16 | 16 | 16 | 16 | 16 | 16 |
-| brute_no_success | yes | 12 | 12 | 12 | 12 | 12 | 12 |
-| scanner | yes | 7 | 7 | 7 | 7 | 7 | 7 |
-| sensitive_probe | yes | 4 | 4 | 4 | 3 | 3 | 4 |
-| bulk_access | yes | 10 | 0 | 0 | 10 | 10 | 10 |
-| post_login_abuse | yes | 11 | 0 | 0 | 0 | 11 | 11 |
+| admin_user | no | 0.01 | 0.01 | 0.02 | 0.02 | 0.02 | 0.02 |
+| forgetful_user | no | 1.00 | 0.02 | 0.16 | 0.16 | 1.00 | 0.18 |
+| heavy_user | no | 0.00 | 0.00 | 0.07 | 0.07 | 0.07 | 0.07 |
+| typical_user | no | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| brute_force | yes | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| brute_no_success | yes | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| bulk_access | yes | 0.00 | 0.00 | 0.75 | 1.00 | 1.00 | 1.00 |
+| post_login_abuse | yes | 0.00 | 0.00 | 0.05 | 1.00 | 1.00 | 1.00 |
+| scanner | yes | 1.00 | 1.00 | 0.75 | 1.00 | 1.00 | 1.00 |
+| sensitive_probe | yes | 1.00 | 1.00 | 0.76 | 0.87 | 1.00 | 1.00 |
 
 **Findings**
 
+- **Timing-aware rules are a robust improvement.** Requiring 3 failures within 60 seconds (or 5 or more at any speed) cut the share of forgetful users flagged by the rules from 100% to 2%. The combined system's F1 rose from 0.85 [0.79–0.90] to 0.95 [0.93–0.98]; the ranges do not overlap, so the worst timing-aware run beat the best count-only run.
+- **Rules and ML fail in different places.** Rules never flagged the two attack types that use valid credentials (`bulk_access`, `post_login_abuse`), while ML flagged both in every run. ML alone flagged only 87% of `sensitive_probe`, which the rules always catch. With 60 attacks per test set, a combined recall of 1.00 in every run means no attack in these data was missed in any run.
+- **The range guard is needed.** The forest alone had recall 0.72 [0.50–0.85] and flagged `bulk_access` and `scanner` sessions only 75% of the time; adding the guard raised recall to 0.98 and `bulk_access` to 100%. A single early run had suggested the forest alone handled bulk access; repeating the experiment corrected that.
+- **Adding rules to ML does not improve F1 on these data** (0.95 ± 0.02 for ML alone versus 0.95 ± 0.01 combined, ranges overlapping). The combination's benefit is steadier recall (1.00 versus 0.98 ± 0.03, with ML alone falling to 0.90 in its worst run) at the same precision, plus explicit, auditable rules for the patterns they cover.
+- **Remaining false alarms come from the ML model:** about 16–18% of forgetful users, 7% of heavy users and 2% of admins.
 - Rules and ML fail in different places. Rules cannot see attackers with valid credentials (`bulk_access`, `post_login_abuse`: 0 of 21). ML catches both but missed one `sensitive_probe` that the rules caught. Together they missed none of these test attacks.
 - **Timing fixed the rules' biggest weakness.** The count-only rule flagged all 26 forgetful users. Requiring 3 failures within 60 seconds (or 5 or more failures at any speed) cut that to 1 with no attack lost. Precision of the combined system rose from 0.69 to 0.82.
 - All remaining false alarms (12 forgetful users and 1 heavy user) come from the ML model, which has no timing features yet.
 
-**Limitations**
+**Limitations (honest)**
 
+- All data is synthetic and generated by a hand-designed generator. Repeating the experiment 20 times shows the results are stable across data sampling and model randomness; it does not show they generalize to real traffic, because every dataset shares the generator's assumptions (for example, that forgetful users retry slowly and attackers fast).
+- The rules, features and model were developed while looking at these same attack types, so the results are optimistic. Unseen attack types would be the real test.
+- The 60-second window, the 5-failure threshold and the range-guard margin (1.25) were chosen by hand, not tuned on a separate validation set. An attacker who tries only 3–4 passwords slowly would now evade the brute-force rule.
+- Per-type percentages rest on about ten test sessions per attack type per run, so they are coarse even after averaging.
+- Detection operates per source IP; there is no IP-reputation data. ML findings are fixed at MEDIUM severity and are leads to investigate, not confirmed attacks.
 - All data is synthetic and designed by the author. In particular, forgetful users were generated as slow and attackers as fast, so the timing result shows the method works under that assumption, not that real traffic behaves this way.
 - The 60-second window and 5-failure threshold were chosen by hand and would need tuning on real logs. An attacker who tries only 3-4 passwords slowly would now evade the brute-force rule.
 - One train/test split with one seed; no confidence intervals.

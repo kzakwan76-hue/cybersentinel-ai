@@ -101,6 +101,7 @@ th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
 
     <section class="panel">
       <h2>Upload history</h2>
+      <div id="summaryBox" class="muted"></div>
       <div class="scroll"><table id="uploads"></table></div>
     </section>
   </main>
@@ -194,7 +195,7 @@ function renderUploads(list) {
   $("uploads").innerHTML = "<tr><th>#</th><th>File</th><th>When</th><th>Events</th><th>Skipped</th><th>Report</th></tr>" +
     list.map(u => `<tr><td>${u.id}</td><td>${esc(u.filename)}</td><td>${esc(fmtDate(u.created_at))}</td>
       <td>${u.events_parsed}</td><td>${u.lines_skipped}</td>
-      <td><button data-report="${u.id}">PDF</button></td></tr>`).join("");
+      <td><button data-report="${u.id}">PDF</button> <button data-summary="${u.id}">Summary</button></td></tr>`).join("");
 }
 
 /* ---------- Loading data ---------- */
@@ -254,7 +255,24 @@ async function downloadReport(id) {
     URL.revokeObjectURL(url);
   } catch (err) { $("uploadMsg").textContent = err.message; }
 }
-$("uploads").onclick = e => { const id = e.target.dataset.report; if (id) downloadReport(id); };
+
+/* ---------- Summary ---------- */
+async function showSummary(id) {
+  const box = $("summaryBox");
+  box.className = "muted";
+  box.textContent = "Generating summary…";
+  try {
+    const data = await api(`/uploads/${id}/summary`, { method: "POST" });
+    const ai = data.source === "ai";
+    box.className = "";
+    box.innerHTML = `<b>Upload #${id}</b> <span class="badge" style="background:var(--${ai ? "LOW" : "MEDIUM"})">${ai ? "AI-written" : "template"}</span><p>${esc(data.summary)}</p>`;
+  } catch (err) { box.className = "msg"; box.textContent = err.message; }
+}
+
+$("uploads").onclick = e => {
+  if (e.target.dataset.report) downloadReport(e.target.dataset.report);
+  if (e.target.dataset.summary) showSummary(e.target.dataset.summary);
+};
 
 /* ---------- Events ---------- */
 $("loginBtn").onclick = () => authAction(false);

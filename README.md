@@ -135,7 +135,15 @@ Sessions flagged per type (test set):
 - Detection is per source IP; there is no IP-reputation data yet.
 - ML findings are fixed at MEDIUM severity and are leads to investigate, not confirmed attacks.
 
+## AI-written summaries (optional)
 
+Detection never uses an LLM. After the rules and ML have produced findings, an optional step asks an LLM to turn them into a short plain-English overview for non-experts.
+
+- Works without any API key: it falls back to a template summary, and also falls back if the API call fails.
+- The model receives only structured findings (severity, title, source IP, reason), not raw log lines. Text that originated in the logs is stripped of control characters and truncated, and the instructions tell the model to treat it as data (prompt-injection mitigation).
+- Hallucination guard: a summary that mentions an IP address not present in the findings is rejected.
+- Summaries are labelled "AI-written", stored once per upload, and can never change a severity or detection.
+- Privacy: IP addresses and finding text are sent to a third-party API when a key is configured. Use synthetic or authorized data only.
 
 ## Roadmap
 

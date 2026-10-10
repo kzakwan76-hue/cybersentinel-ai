@@ -64,3 +64,8 @@ class StatsOut(BaseModel):
     total_findings: int
     by_severity: dict[str, int]
     top_ips: list[IpCount]
+
+class SummaryOut(BaseModel):
+    upload_id: int
+    summary: str
+    source: str  # "ai" or "template"    

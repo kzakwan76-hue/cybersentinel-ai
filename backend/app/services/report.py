@@ -65,6 +65,16 @@ def _finding_block(finding: orm.FindingRecord, heading: ParagraphStyle, body: Pa
         ]
     )
 
+def _ai_overview(upload: orm.Upload, body: ParagraphStyle, small: ParagraphStyle) -> list:
+    text = getattr(upload, "ai_summary", None)
+    if not text:
+        return []
+    return [
+        Spacer(1, 2 * mm),
+        Paragraph("AI-written overview (generated from the findings; verify before acting)", small),
+        Paragraph(escape(text), body),
+    ]
+
 
 def build_pdf(upload: orm.Upload) -> bytes:
     """Build the report for one upload and return the PDF file as bytes."""
@@ -112,6 +122,7 @@ def build_pdf(upload: orm.Upload) -> bytes:
         Spacer(1, 5 * mm),
         Paragraph("Summary", styles["Heading2"]),
         Paragraph(escape(summary_text(upload, findings, counts)), body),
+        *_ai_overview(upload, body, small),
         Spacer(1, 3 * mm),
         summary_table,
         Spacer(1, 6 * mm),

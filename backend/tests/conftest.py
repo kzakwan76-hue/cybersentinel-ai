@@ -11,3 +11,5 @@ from app.database import Base, engine  # noqa: E402
 from app import orm  # noqa: E402,F401
 
 Base.metadata.create_all(bind=engine)
+
+os.environ["ANTHROPIC_API_KEY"] = ""  # tests never call the real API

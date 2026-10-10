@@ -14,10 +14,11 @@ from app.api import auth
 from app.config import MAX_UPLOAD_BYTES
 from app.database import Base, engine, get_db
 from app.deps import get_current_user
-from app.schemas import AnalysisOut, FindingOut, IpCount, StatsOut, UploadOut
+from app.schemas import AnalysisOut, FindingOut, IpCount, StatsOut, UploadOut, SummaryOut
 from app.services.analysis import analyze_events
 from app.services.parser import parse_logs
 from app.services.report import build_pdf
+from app.services.summarizer import summary_for_upload
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("cybersentinel")
@@ -190,6 +191,21 @@ def download_report(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="cybersentinel-report-{upload.id}.pdf"'},
     )
+@app.post("/uploads/{upload_id}/summary", response_model=SummaryOut)
+def upload_summary(
+    upload_id: int,
+    db: Session = Depends(get_db),
+    current_user: orm.User = Depends(get_current_user),
+):
+    """Plain-English summary of one of YOUR uploads (AI-written if configured, else a template)."""
+    upload = db.scalar(
+        select(orm.Upload).where(orm.Upload.id == upload_id, orm.Upload.user_id == current_user.id)
+    )
+    if upload is None:  # same answer for "missing" and "belongs to someone else"
+        raise HTTPException(status_code=404, detail="Upload not found.")
+    summary, source = summary_for_upload(db, upload)
+    return SummaryOut(upload_id=upload.id, summary=summary, source=source)
+
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 if FRONTEND_DIR.is_dir():

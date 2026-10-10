@@ -151,6 +151,42 @@ Detection never uses an LLM. After the rules and ML have produced findings, an o
 - Summaries are labelled "AI-written", stored once per upload, and can never change a severity or detection.
 - Privacy: IP addresses and finding text are sent to a third-party API when a key is configured. Use synthetic or authorized data only.
 
+## Supported log formats
+
+Detected line by line, so one file can mix them. All timestamps are normalized to `YYYY-MM-DD HH:MM:SS` (web logs are converted to UTC).
+
+| Format | Example | What becomes an event |
+|---|---|---|
+| Simple (project format) | `[2026-10-05 09:00:01] 192.168.1.24 - FAILED LOGIN` | Failed login, successful login, or page access |
+| SSH syslog (`auth.log`) | `Oct  5 09:00:01 web1 sshd[811]: Failed password for root from 203.0.113.5 port 22 ssh2` | `Failed ...` is a failed login and `Accepted ...` a successful one; other sshd lines are ignored |
+| Web access log (Apache/nginx combined) | `203.0.113.50 - - [05/Oct/2026:09:10:00 +0000] "GET /.env HTTP/1.1" 404 153 "-" "curl/8.0"` | Each request is a page access (query string removed, percent-decoded once, lowercased, static assets ignored). A `POST` to a login path with 401/403 is a failed login, and 2xx/3xx a successful one |
+
+Limitations: classic syslog has no year, so the current year is assumed (year boundaries are not handled); only IPv4 sources are analysed; the web login detection is a heuristic based on a list of login paths and cannot see failed logins that return `200` (some CMSs do this); behind a proxy or CDN the logged IP may belong to the proxy; and the ML model was trained on synthetic sessions, so on real web traffic (crawlers, shared IPs) its findings will be noisier than the evaluation suggests.
+
+## Threat model
+
+**What is protected:** user accounts and password hashes; the JWT signing key (`SECRET_KEY`); uploaded log data and the findings derived from it (IP addresses and request paths); optional third-party API keys.
+
+**Who is assumed to attack:** (1) anonymous internet clients; (2) a registered user trying to read another user's data; (3) whoever controls the text inside an uploaded log (log content is untrusted); (4) someone who obtains a copy of the database or the repository.
+
+| Threat | Mitigation in this project | Residual risk |
+|---|---|---|
+| Password guessing against the app's own login | Argon2 hashing; failed attempts are stored in the database and limited per (email, IP) and per IP within 15 minutes; locked clients get `429` even with the right password; unknown emails are throttled and answered identically; constant-time-style dummy hash check | Distributed attacks across many IPs; clients behind a shared proxy IP; no MFA |
+| Stolen database | Only Argon2 password hashes are stored | Findings and log-derived data are stored unencrypted |
+| Token theft or forgery | HS256 JWT signed with a secret from the environment; tokens expire (60 minutes by default) | Token lives in `sessionStorage`, so an XSS bug could expose it; no revocation or refresh; HTTPS must be provided by the deployment |
+| Reading another user's data | Every query is scoped to the logged-in user; another user's upload returns `404`; covered by tests | Relies on every new endpoint following the same pattern |
+| Malicious log content (XSS, PDF markup, prompt injection) | HTML escaping in the dashboard; text escaped before reaching the PDF library; the optional LLM receives only structured findings, with log-derived text cleaned and truncated, and summaries mentioning unknown IPs are rejected | A model can still write a misleading summary (it is labelled "AI-written") |
+| Resource exhaustion through uploads | 2 MB upload cap, UTF-8 only, input validation | No per-user quota and no general API rate limiting |
+| Secret leakage | `.env` is git-ignored; `.env.example` holds placeholders; the app refuses to start without `SECRET_KEY`; CI needs no secrets | Repository history was checked by hand, not by an automated scanner |
+| Vulnerable dependencies | CI installs from `requirements.txt` on every push | No automated dependency scanning |
+| Evading or poisoning the ML model | The model is trained offline on synthetic data only, never on uploads | An attacker who stays inside the learned "normal" range evades it; the range-guard margin is hand-tuned |
+
+**Out of scope:** TLS termination and network defenses, multi-factor authentication, account recovery, per-user quotas, security headers such as CSP, and data-retention or deletion features. IP addresses can be personal data, so use synthetic or properly authorized logs only.
+
+**Assumptions:** the app is deployed behind HTTPS, `SECRET_KEY` and database credentials stay private, and the app is used by a small number of trusted-but-not-fully-trusted users.
+
+**Misuse:** CyberSentinel only analyzes log text. It sends no traffic and scans nothing.
+
 ## Roadmap
 
 - [x] Parser, rule engine, tests

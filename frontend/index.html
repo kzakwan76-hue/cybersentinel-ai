@@ -105,6 +105,16 @@ th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
       <div id="timelineBox" class="muted"></div>
       <div class="scroll"><table id="uploads"></table></div>
     </section>
+
+    <section class="panel">
+      <h2>Delete my account</h2>
+      <p class="muted">Permanently deletes your account, every upload and every finding. This cannot be undone.</p>
+      <div class="row">
+        <input id="deletePassword" type="password" placeholder="Confirm your password" autocomplete="current-password">
+        <button id="deleteAccountBtn" style="border-color:var(--CRITICAL)">Delete my account</button>
+      </div>
+      <div id="deleteMsg" class="msg"></div>
+    </section>
   </main>
 </div>
 
@@ -135,7 +145,7 @@ async function api(path, options = {}) {
     if (res.status === 429 && wait) detail += ` Try again in about ${Math.ceil(wait / 60)} minute(s).`;
     throw new Error(detail);
   }
-  return res.json();
+  return res.status === 204 ? null : res.json();
 }
 
 /* ---------- Auth ---------- */
@@ -198,7 +208,7 @@ function renderUploads(list) {
   $("uploads").innerHTML = "<tr><th>#</th><th>File</th><th>When</th><th>Events</th><th>Skipped</th><th>Actions</th></tr>" +
     list.map(u => `<tr><td>${u.id}</td><td>${esc(u.filename)}</td><td>${esc(fmtDate(u.created_at))}</td>
       <td>${u.events_parsed}</td><td>${u.lines_skipped}</td>
-      <td><button data-report="${u.id}">PDF</button> <button data-summary="${u.id}">Summary</button> <button data-timeline="${u.id}">Timeline</button></td></tr>`).join("");
+      <td><button data-report="${u.id}">PDF</button> <button data-summary="${u.id}">Summary</button> <button data-timeline="${u.id}">Timeline</button> <button data-delete="${u.id}" style="border-color:var(--CRITICAL)">Delete</button></td></tr>`).join("");
 }
 
 /* ---------- Loading data ---------- */
@@ -302,7 +312,7 @@ function renderTimeline(t) {
   const marks = t.markers.map(m => `<circle cx="${(left + m.bucket * slotW + barW / 2).toFixed(1)}" cy="8" r="5" style="fill:var(--${sev(m.severity)})"><title>${esc(m.severity)}: ${esc(m.title)} (${esc(m.ip)})</title></circle>`).join("");
   const legend = names.map((n, k) => `<span style="margin-right:14px"><span style="display:inline-block;width:10px;height:10px;background:${colors[k]};margin-right:5px"></span>${n}</span>`).join("");
 
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto" role="img" aria-label="Activity timeline">
+  return `<svg viewBox="0 0 ${W} ${H}" style="display:block;width:100%;max-width:${W}px;height:auto" role="img" aria-label="Activity timeline">
       <line x1="${left}" y1="${H - bottom}" x2="${W - 6}" y2="${H - bottom}" style="stroke:var(--line)"/>
       <text x="${left - 4}" y="${top + 4}" text-anchor="end" style="fill:var(--mut)" font-size="11">${max}</text>
       <text x="${left - 4}" y="${H - bottom}" text-anchor="end" style="fill:var(--mut)" font-size="11">0</text>
@@ -319,14 +329,44 @@ async function showTimeline(id) {
   try {
     const data = await api(`/uploads/${id}/timeline`);
     box.className = "";
-    box.innerHTML = `<b>Activity timeline, upload #${id}</b>` + renderTimeline(data);
+    box.innerHTML = `<div><b>Activity timeline, upload #${id}</b></div>` + renderTimeline(data);
   } catch (err) { box.className = "msg"; box.textContent = err.message; }
 }
+
+/* ---------- Deleting data ---------- */
+async function deleteUpload(id) {
+  if (!confirm(`Delete upload #${id} and its findings? This cannot be undone.`)) return;
+  try {
+    await api(`/uploads/${id}`, { method: "DELETE" });
+    $("summaryBox").textContent = "";
+    $("timelineBox").textContent = "";
+    await refresh();
+  } catch (err) { $("uploadMsg").textContent = err.message; }
+}
+
+async function deleteAccount() {
+  const msg = $("deleteMsg");
+  msg.textContent = "";
+  const password = $("deletePassword").value;
+  if (!password) { msg.textContent = "Enter your password to confirm."; return; }
+  if (!confirm("Permanently delete your account and ALL of your data? This cannot be undone.")) return;
+  try {
+    await api("/auth/delete-account", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    $("deletePassword").value = "";
+    logout();
+  } catch (err) { msg.textContent = err.message; }
+}
+$("deleteAccountBtn").onclick = deleteAccount;
 
 $("uploads").onclick = e => {
   if (e.target.dataset.report) downloadReport(e.target.dataset.report);
   if (e.target.dataset.summary) showSummary(e.target.dataset.summary);
   if (e.target.dataset.timeline) showTimeline(e.target.dataset.timeline);
+  if (e.target.dataset.delete) deleteUpload(e.target.dataset.delete);
 };
 
 /* ---------- Events ---------- */

@@ -20,7 +20,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
-    uploads: Mapped[list["Upload"]] = relationship(back_populates="user")
+    uploads: Mapped[list["Upload"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Upload(Base):

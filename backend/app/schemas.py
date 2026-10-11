@@ -83,4 +83,8 @@ class TimelineOut(BaseModel):
     end: str | None = None
     bucket_seconds: int | None = None
     counts: list[list[int]] = Field(default_factory=list)
-    markers: list[MarkerOut] = Field(default_factory=list)      
+    markers: list[MarkerOut] = Field(default_factory=list)    
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)      

@@ -226,6 +226,22 @@ def upload_timeline(
         available=True, **upload.timeline, markers=markers_for(upload.timeline, upload.findings)
     )
 
+@app.delete("/uploads/{upload_id}", status_code=204)
+def delete_upload(
+    upload_id: int,
+    db: Session = Depends(get_db),
+    current_user: orm.User = Depends(get_current_user),
+):
+    """Delete one of YOUR uploads and its findings."""
+    upload = db.scalar(
+        select(orm.Upload).where(orm.Upload.id == upload_id, orm.Upload.user_id == current_user.id)
+    )
+    if upload is None:  # same answer for "missing" and "belongs to someone else"
+        raise HTTPException(status_code=404, detail="Upload not found.")
+    db.delete(upload)
+    db.commit()
+    logger.info("User %d deleted upload %d", current_user.id, upload_id)
+    return Response(status_code=204)
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 if FRONTEND_DIR.is_dir():

@@ -23,6 +23,7 @@ An AI-assisted security log analysis platform. Upload authentication and server 
 - PDF security report per upload
 - Measured evaluation: precision, recall, F1, confusion matrices (below)
 - Activity timeline: failed logins, successful logins and page requests over time with threat markers (aggregated counts are stored, not raw events; bucket size is chosen automatically)
+- Data deletion: delete individual uploads or the whole account (password-confirmed, throttled); everything stored under the account is removed
 
 ## Architecture
 
@@ -182,8 +183,9 @@ Limitations: classic syslog has no year, so the current year is assumed (year bo
 | Secret leakage | `.env` is git-ignored; `.env.example` holds placeholders; the app refuses to start without `SECRET_KEY`; CI needs no secrets | Repository history was checked by hand, not by an automated scanner |
 | Vulnerable dependencies | CI installs from `requirements.txt` on every push | No automated dependency scanning |
 | Evading or poisoning the ML model | The model is trained offline on synthetic data only, never on uploads | An attacker who stays inside the learned "normal" range evades it; the range-guard margin is hand-tuned |
+| Data kept longer than a user wants | Users can delete single uploads or their whole account (all uploads and findings cascade). Account deletion needs the current password and shares the login throttle, so a stolen token alone cannot destroy an account | No automatic retention period; copies already downloaded (PDFs) and database backups are outside the app's control; text previously sent to a third-party AI API cannot be recalled |
 
-**Out of scope:** TLS termination and network defenses, multi-factor authentication, account recovery, per-user quotas, security headers such as CSP, and data-retention or deletion features. IP addresses can be personal data, so use synthetic or properly authorized logs only.
+**Out of scope:** TLS termination and network defenses, multi-factor authentication, account recovery, per-user quotas, security headers such as CSP. IP addresses can be personal data, so use synthetic or properly authorized logs only.
 
 **Assumptions:** the app is deployed behind HTTPS, `SECRET_KEY` and database credentials stay private, and the app is used by a small number of trusted-but-not-fully-trusted users.
 

@@ -22,6 +22,7 @@ An AI-assisted security log analysis platform. Upload authentication and server 
 - Dashboard: statistics, severity chart, top source IPs, threat cards, search and filters, upload history
 - PDF security report per upload
 - Measured evaluation: precision, recall, F1, confusion matrices (below)
+- Activity timeline: failed logins, successful logins and page requests over time with threat markers (aggregated counts are stored, not raw events; bucket size is chosen automatically)
 
 ## Architecture
 
@@ -140,6 +141,7 @@ Share of sessions flagged per session type (mean over the 20 runs; for attack ty
 - Detection is per source IP; there is no IP-reputation data yet.
 - ML findings are fixed at MEDIUM severity and are leads to investigate, not confirmed attacks.
 - Login throttling uses the connecting IP address. Behind a reverse proxy every user shares the proxy's IP unless trusted-proxy handling is configured, and a distributed attack (many IPs against one account) is not throttled per account.
+- The timeline needs timestamps in the log. Only counts are stored, so uploads made before the feature existed have no timeline, and classic syslog lines (no year) assume the current year.
 
 ## AI-written summaries (optional)
 

@@ -68,4 +68,19 @@ class StatsOut(BaseModel):
 class SummaryOut(BaseModel):
     upload_id: int
     summary: str
-    source: str  # "ai" or "template"    
+    source: str  # "ai" or "template"  
+
+class MarkerOut(BaseModel):
+    bucket: int
+    severity: str
+    title: str
+    ip: str
+
+
+class TimelineOut(BaseModel):
+    available: bool
+    start: str | None = None
+    end: str | None = None
+    bucket_seconds: int | None = None
+    counts: list[list[int]] = Field(default_factory=list)
+    markers: list[MarkerOut] = Field(default_factory=list)      

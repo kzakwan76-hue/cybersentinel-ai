@@ -102,6 +102,7 @@ th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
     <section class="panel">
       <h2>Upload history</h2>
       <div id="summaryBox" class="muted"></div>
+      <div id="timelineBox" class="muted"></div>
       <div class="scroll"><table id="uploads"></table></div>
     </section>
   </main>
@@ -194,10 +195,10 @@ function renderFindings(list) {
 }
 
 function renderUploads(list) {
-  $("uploads").innerHTML = "<tr><th>#</th><th>File</th><th>When</th><th>Events</th><th>Skipped</th><th>Report</th></tr>" +
+  $("uploads").innerHTML = "<tr><th>#</th><th>File</th><th>When</th><th>Events</th><th>Skipped</th><th>Actions</th></tr>" +
     list.map(u => `<tr><td>${u.id}</td><td>${esc(u.filename)}</td><td>${esc(fmtDate(u.created_at))}</td>
       <td>${u.events_parsed}</td><td>${u.lines_skipped}</td>
-      <td><button data-report="${u.id}">PDF</button> <button data-summary="${u.id}">Summary</button></td></tr>`).join("");
+      <td><button data-report="${u.id}">PDF</button> <button data-summary="${u.id}">Summary</button> <button data-timeline="${u.id}">Timeline</button></td></tr>`).join("");
 }
 
 /* ---------- Loading data ---------- */
@@ -240,6 +241,7 @@ async function uploadFile(file) {
     msg.textContent = `Analyzed ${result.upload.events_parsed} events, ${result.findings.length} threat(s) found` +
       (result.upload.lines_skipped ? `, ${result.upload.lines_skipped} unreadable line(s) skipped.` : ".");
     await refresh();
+    showTimeline(result.upload.id);
   } catch (err) { msg.className = "msg"; msg.textContent = err.message; }
   $("file").value = "";
 }
@@ -271,9 +273,60 @@ async function showSummary(id) {
   } catch (err) { box.className = "msg"; box.textContent = err.message; }
 }
 
+/* ---------- Timeline ---------- */
+const formatSeconds = s => s % 3600 === 0 ? `${s / 3600} h` : s % 60 === 0 ? `${s / 60} min` : `${s} s`;
+
+function renderTimeline(t) {
+  if (!t.available) {
+    return `<span class="muted">No timeline for this upload: the log has no usable timestamps, or it was uploaded before timelines existed.</span>`;
+  }
+  const W = 720, H = 200, left = 34, top = 18, bottom = 24;
+  const slots = t.counts.length;
+  const slotW = (W - left - 6) / slots;
+  const barW = Math.min(40, Math.max(2, slotW * 0.8));
+  const plotH = H - top - bottom;
+  const max = Math.max(1, ...t.counts.map(c => c[0] + c[1] + c[2]));
+  const colors = ["var(--CRITICAL)", "var(--LOW)", "var(--acc)"];
+  const names = ["failed logins", "successful logins", "page requests"];
+
+  let bars = "";
+  t.counts.forEach((counts, i) => {
+    let y = H - bottom;
+    counts.forEach((value, k) => {
+      if (!value) return;
+      const h = value / max * plotH;
+      y -= h;
+      bars += `<rect x="${(left + i * slotW).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" style="fill:${colors[k]}"><title>${names[k]}: ${value}</title></rect>`;
+    });
+  });
+  const marks = t.markers.map(m => `<circle cx="${(left + m.bucket * slotW + barW / 2).toFixed(1)}" cy="8" r="5" style="fill:var(--${sev(m.severity)})"><title>${esc(m.severity)}: ${esc(m.title)} (${esc(m.ip)})</title></circle>`).join("");
+  const legend = names.map((n, k) => `<span style="margin-right:14px"><span style="display:inline-block;width:10px;height:10px;background:${colors[k]};margin-right:5px"></span>${n}</span>`).join("");
+
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto" role="img" aria-label="Activity timeline">
+      <line x1="${left}" y1="${H - bottom}" x2="${W - 6}" y2="${H - bottom}" style="stroke:var(--line)"/>
+      <text x="${left - 4}" y="${top + 4}" text-anchor="end" style="fill:var(--mut)" font-size="11">${max}</text>
+      <text x="${left - 4}" y="${H - bottom}" text-anchor="end" style="fill:var(--mut)" font-size="11">0</text>
+      <text x="${left}" y="${H - 6}" style="fill:var(--mut)" font-size="11">${esc(t.start)}</text>
+      <text x="${W - 6}" y="${H - 6}" text-anchor="end" style="fill:var(--mut)" font-size="11">${esc(t.end)}</text>
+      ${bars}${marks}</svg>
+    <div class="muted">${legend} Dots are threats (hover for details). Each bar covers ${esc(formatSeconds(t.bucket_seconds))}.</div>`;
+}
+
+async function showTimeline(id) {
+  const box = $("timelineBox");
+  box.className = "muted";
+  box.textContent = "Loading timeline…";
+  try {
+    const data = await api(`/uploads/${id}/timeline`);
+    box.className = "";
+    box.innerHTML = `<b>Activity timeline, upload #${id}</b>` + renderTimeline(data);
+  } catch (err) { box.className = "msg"; box.textContent = err.message; }
+}
+
 $("uploads").onclick = e => {
   if (e.target.dataset.report) downloadReport(e.target.dataset.report);
   if (e.target.dataset.summary) showSummary(e.target.dataset.summary);
+  if (e.target.dataset.timeline) showTimeline(e.target.dataset.timeline);
 };
 
 /* ---------- Events ---------- */

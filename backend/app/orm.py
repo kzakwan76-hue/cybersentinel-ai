@@ -33,6 +33,7 @@ class Upload(Base):
     events_parsed: Mapped[int] = mapped_column(default=0)
     lines_skipped: Mapped[int] = mapped_column(default=0)
     ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    timeline: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="uploads")
     findings: Mapped[list["FindingRecord"]] = relationship(
@@ -62,4 +63,4 @@ class LoginFailure(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), index=True)  # whatever was typed, even if no such account
     ip: Mapped[str] = mapped_column(String(45), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)   
